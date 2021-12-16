@@ -1,10 +1,19 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
 // IERC165
 interface IERC165 {
     function supportsInterface(bytes4 interfaceId) external view returns (bool);
 }
 
-// import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-// import "./IERC721.sol";
+// ERC165
+abstract contract ERC165 is IERC165 {
+    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
+        return interfaceId == type(IERC165).interfaceId;
+    }
+}
+
+// IERC721
 interface IERC721 is IERC165 {
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
@@ -12,6 +21,7 @@ interface IERC721 is IERC165 {
 
     function balanceOf(address owner) external view returns (uint256 balance);
     function ownerOf(uint256 tokenId) external view returns (address owner);
+
     function safeTransferFrom(
         address from,
         address to,
@@ -28,6 +38,7 @@ interface IERC721 is IERC165 {
     function getApproved(uint256 tokenId) external view returns (address operator);
     function setApprovalForAll(address operator, bool _approved) external;
     function isApprovedForAll(address owner, address operator) external view returns (bool);
+
     function safeTransferFrom(
         address from,
         address to,
@@ -36,7 +47,7 @@ interface IERC721 is IERC165 {
     ) external;
 }
 
-// import "./IERC721Receiver.sol";
+// IERC721Receiver
 interface IERC721Receiver {
     function onERC721Received(
         address operator,
@@ -46,15 +57,14 @@ interface IERC721Receiver {
     ) external returns (bytes4);
 }
 
-// import "./extensions/IERC721Metadata.sol";
+// IERC721Metadata
 interface IERC721Metadata is IERC721 {
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function tokenURI(uint256 tokenId) external view returns (string memory);
 }
 
-
-// import "../../utils/Address.sol";
+// Address
 library Address {
     function isContract(address account) internal view returns (bool) {
         uint256 size;
@@ -142,7 +152,9 @@ library Address {
         if (success) {
             return returndata;
         } else {
+            // Look for revert reason and bubble it up if present
             if (returndata.length > 0) {
+                // The easiest way to bubble the revert reason is using memory via assembly
                 assembly {
                     let returndata_size := mload(returndata)
                     revert(add(32, returndata), returndata_size)
@@ -154,7 +166,7 @@ library Address {
     }
 }
 
-// import "../../utils/Context.sol";
+// Context
 abstract contract Context {
     function _msgSender() internal view virtual returns (address) {
         return msg.sender;
@@ -165,7 +177,7 @@ abstract contract Context {
     }
 }
 
-// import "../../utils/Strings.sol";
+// Strings
 library Strings {
     bytes16 private constant _HEX_SYMBOLS = "0123456789abcdef";
 
@@ -214,18 +226,11 @@ library Strings {
     }
 }
 
-// import "../../utils/introspection/ERC165.sol";
-abstract contract ERC165 is IERC165 {
-    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
-        return interfaceId == type(IERC165).interfaceId;
-    }
-}
-
+// ERC721
 contract ERC721 is Context, ERC165, IERC721, IERC721Metadata {
     using Address for address;
     using Strings for uint256;
 
-    // Token name
     string private _name;
     string private _symbol;
     mapping(uint256 => address) private _owners;
@@ -402,6 +407,7 @@ contract ERC721 is Context, ERC165, IERC721, IERC721Metadata {
 
         _beforeTokenTransfer(from, to, tokenId);
 
+        // Clear approvals from the previous owner
         _approve(address(0), tokenId);
 
         _balances[from] -= 1;
@@ -456,9 +462,10 @@ contract ERC721 is Context, ERC165, IERC721, IERC721Metadata {
     ) internal virtual {}
 }
 
-// import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+// ERC721URIStorage
 abstract contract ERC721URIStorage is ERC721 {
     using Strings for uint256;
+
     mapping(uint256 => string) private _tokenURIs;
 
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
@@ -467,9 +474,11 @@ abstract contract ERC721URIStorage is ERC721 {
         string memory _tokenURI = _tokenURIs[tokenId];
         string memory base = _baseURI();
 
+        // If there is no base URI, return the token URI.
         if (bytes(base).length == 0) {
             return _tokenURI;
         }
+        // If both are set, concatenate the baseURI and tokenURI (via abi.encodePacked).
         if (bytes(_tokenURI).length > 0) {
             return string(abi.encodePacked(base, _tokenURI));
         }
@@ -491,7 +500,7 @@ abstract contract ERC721URIStorage is ERC721 {
     }
 }
 
-// import "@openzeppelin/contracts/utils/Counters.sol";
+// Counters
 library Counters {
     struct Counter {
         uint256 _value; // default: 0
@@ -520,51 +529,159 @@ library Counters {
     }
 }
 
-contract BFT is ERC721URIStorage {
+// BscNFT
+contract BscNFT is ERC721URIStorage {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
+    
+    constructor() ERC721("BinanceSmartChainNFT", "BFT") {}
 
-    constructor() ERC721("BSCNonFungibleToken", "BFT") {}
+    mapping(string => bool) private existsURI; // tokenURI => true or false
+    mapping(uint256 => address[]) private ownerHistory; // tokenId => ownerHistory
+    mapping(address => uint256[]) private myTokenList; // some account => tokenIds owned by the account
+    mapping(uint256 => uint256) private salesList; // tokenId => price
 
-    mapping(uint256 => address[]) ownerList;
-    mapping(address => uint256[]) tokenList;
+    address private Marketaddress; // Market address
 
-    function create(address _from, string memory _uri) public {
+    // approve the Market address
+    function setApproveAddress(address _Marketaddress) public {
+        Marketaddress = _Marketaddress;
+    }
+
+    function setApprove(uint256 _tokenId) private {
+        approve(Marketaddress, _tokenId);
+    }
+
+    // create token
+    function createToken(string memory _tokenURI) public {
+        require(!existsURI[_tokenURI], "The URI already exsists");
+
         _tokenIds.increment();
+        uint256 newTokenId = _tokenIds.current();
 
-        uint256 newId = _tokenIds.current();
+        _safeMint(msg.sender, newTokenId);
+        _setTokenURI(newTokenId, _tokenURI);
 
-        _safeMint(_from, newId);
-        _setTokenURI(newId, _uri);
-
-        ownerList[newId].push(msg.sender);
-        tokenList[msg.sender].push(newId);
+        ownerHistory[newTokenId].push(msg.sender);
+        myTokenList[msg.sender].push(newTokenId);
+        existsURI[_tokenURI] = true;
     }
 
-    function sendToken(uint256 _tokenId, address _to, address _from) public {
-        safeTransferFrom(_from, _to, _tokenId);
-        
-        ownerList[_tokenId].push(_to);
-        tokenList[_to].push(_tokenId);
+    // edit myTokenList and ownerHistory
+    function editList(uint256 _tokenId, address _buyer) public {
+        address seller = ownerOf(_tokenId);
+        uint256 len = myTokenList[seller].length;
 
-        for(uint i = 0; i < tokenList[_from].length; i++) {
-            if (tokenList[_from][i] == _tokenId)
-                delete tokenList[_from][i];
+        for (uint i = 0; i < len; i++) {
+            if (myTokenList[seller][i] == _tokenId) {
+                myTokenList[seller][i] = myTokenList[seller][len-1];
+            }
         }
+        myTokenList[seller].pop();
+        
+        ownerHistory[_tokenId].push(_buyer);
+        myTokenList[_buyer].push(_tokenId);
     }
 
+    // send the token from seller to buyer
+    function sendToken(uint256 _tokenId, address _buyer) public {
+        address seller = ownerOf(_tokenId);
+        safeTransferFrom(seller, _buyer, _tokenId);
+        delete salesList[_tokenId];
+    }
+    
+    // put the token on sales list
+    function salesToken(uint256 _tokenId, uint256 _price) public {
+        require(_tokenId > 0 && _tokenId <= getCount(), "Does not exists the tokenId");
+        require(msg.sender == ownerOf(_tokenId), "You are not owner of the token");
+        require(salesList[_tokenId] == 0, "The token already exists in salesList");
+        require(_price > 0, "The price is higher than zero");
+
+        setApprove(_tokenId);
+        salesList[_tokenId] = _price;
+    }
+
+    // get list of token on sale
+    function getSalesList(uint256 _tokenId) public view returns(uint256, uint256, string memory, address) {
+        require(_tokenId > 0 && _tokenId <= getCount(), "Does not exists the tokenId");
+        require(salesList[_tokenId] > 0, "Does not sales the token");
+
+        return (
+            _tokenId,
+            salesList[_tokenId],
+            tokenURI(_tokenId),
+            ownerOf(_tokenId)
+        );
+    }
+
+    // get token price
+    function getTokenPrice(uint256 _tokenId) public view returns(uint256) {
+        require(_tokenId > 0 && _tokenId <= getCount(), "Does not exists the tokenId");
+        require(salesList[_tokenId] > 0, "Does not sales the token");
+        return salesList[_tokenId];
+    }
+
+    // token Counter
     function getCount() public view returns(uint256) {
-        if (_tokenIds.current() < 1)
-            return 0;
-        else
-            return _tokenIds.current();
+        return _tokenIds.current();
     }
 
-    function getOwnerList(uint256 _tokenId) public view returns(address[] memory) {
-        return ownerList[_tokenId];
+    // owner history of the token
+    function getOwnerHistory(uint256 _tokenId) public view returns(address[] memory) {
+        require(_tokenId > 0 && _tokenId <= getCount(), "Does not exists the tokenId");
+        return ownerHistory[_tokenId];
     }
 
-    function getTokenList(address _account) public view returns(uint256[] memory) {
-        return tokenList[_account];
+    // my token list
+    function getMyTokenList(address _account) public view returns(uint256[] memory) {
+        return myTokenList[_account];
+    }
+
+    // get contract balance
+    function getContractBalance() public view returns(uint256) {
+        return address(this).balance;
+    }
+}
+
+// Market
+contract Market {
+    address private BFTaddress; // BscNFT address
+
+    constructor(address _BFTaddress) {
+        BFTaddress = _BFTaddress; // BscNFT address
+        setApproveAddress(address(this)); // set the Market address to approve
+    }
+
+    // set the Market address to approve
+    function setApproveAddress(address _Marketaddress) private {
+        BscNFT _BFT = BscNFT(BFTaddress);
+        _BFT.setApproveAddress(_Marketaddress);
+    }
+
+    // buy the token
+    function buyToken(uint256 _tokenId) public payable {
+        BscNFT _BFT = BscNFT(BFTaddress);
+        address seller = _BFT.ownerOf(_tokenId);
+        uint256 price = _BFT.getTokenPrice(_tokenId);
+
+        require(_tokenId > 0 && _tokenId <= _BFT.getCount(), "Does not exists the tokenId");
+        require(msg.sender != seller, "You are Seller, Seller cannot puchase");
+        require(price > 0, "Does not sales the token");
+        require(msg.value == price, "Incorrected amount");
+        
+        // edit myTokenList and ownerhistory
+        _BFT.editList(_tokenId, msg.sender);
+
+        // payment od price
+        // payable(seller).call{value: msg.value}(""); // return type is bool
+        payable(seller).transfer(msg.value);
+
+        // transfer the token from seller to buyer
+        _BFT.sendToken(_tokenId, msg.sender);
+    }
+
+    // get contract balance
+    function getMarketBalance() public view returns(uint256) {
+        return address(this).balance;
     }
 }
