@@ -1,5 +1,9 @@
 const BFT = artifacts.require("BFT");
+const Market = artifacts.require("Market");
 
-module.exports = function (deployer) {
-    deployer.deploy(BFT);
+module.exports = async (deployer) => {
+    await deployer.deploy(BFT);
+
+    const deployedBFT = BFT.deployed();
+    await deployer.deploy(Market, deployedBFT.address);
 };

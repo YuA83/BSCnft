@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
@@ -9,47 +8,112 @@ contract BFT is ERC721URIStorage {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
-    constructor() ERC721("BSCNonFungibleToken", "BFT") {}
+    constructor() ERC721("BinanceSmartChainNFT", "BFT") {}
 
-    mapping(uint256 => address[]) ownerList;
-    mapping(address => uint256[]) tokenList;
+    mapping(string => bool) private existsURI; // tokenURI => true or false
+    mapping(uint256 => address[]) private ownerHistory; // tokenId => ownerHistory
+    mapping(address => uint256[]) private myTokenList; // some account => tokenIds owned by the account
+    mapping(uint256 => uint256) private salesList; // tokenId => price
 
-    function create(address _from, string memory _uri) public {
+    address private Marketaddress; // Market address
+
+    // Market contract에 권한 승인(approve)
+    function setApproveAddress(address _Marketaddress) public {
+        Marketaddress = _Marketaddress;
+    }
+
+    function setApprove(uint256 _tokenId) private {
+        approve(Marketaddress, _tokenId);
+    }
+
+    // NFT 생성
+    function createToken(string memory _tokenURI) public {
+        require(!existsURI[_tokenURI], "The URI already exsists");
+
         _tokenIds.increment();
+        uint256 newTokenId = _tokenIds.current();
 
-        uint256 newId = _tokenIds.current();
+        _safeMint(msg.sender, newTokenId);
+        _setTokenURI(newTokenId, _tokenURI);
 
-        _safeMint(_from, newId);
-        _setTokenURI(newId, _uri);
-
-        ownerList[newId].push(msg.sender);
-        tokenList[msg.sender].push(newId);
+        ownerHistory[newTokenId].push(msg.sender);
+        myTokenList[msg.sender].push(newTokenId);
+        existsURI[_tokenURI] = true;
     }
 
-    function sendToken(uint256 _tokenId, address _to, address _from) public {
-        safeTransferFrom(_from, _to, _tokenId);
-        
-        ownerList[_tokenId].push(_to);
-        tokenList[_to].push(_tokenId);
+    // edit map list
+    function editList(uint256 _tokenId, address _buyer) public {
+        address seller = ownerOf(_tokenId);
+        uint256 len = myTokenList[seller].length;
 
-        for(uint i = 0; i < tokenList[_from].length; i++) {
-            if (tokenList[_from][i] == _tokenId)
-                delete tokenList[_from][i];
+        for (uint i = 0; i < len; i++) {
+            if (myTokenList[seller][i] == _tokenId) {
+                myTokenList[seller][i] = myTokenList[seller][len-1];
+            }
         }
+        myTokenList[seller].pop();
+        
+        ownerHistory[_tokenId].push(_buyer);
+        myTokenList[_buyer].push(_tokenId);
     }
 
+    // send the token from seller to buyer
+    function sendToken(uint256 _tokenId, address _buyer) public {
+        address seller = ownerOf(_tokenId);
+        safeTransferFrom(seller, _buyer, _tokenId);
+        delete salesList[_tokenId];
+    }
+    
+    // NFT를 판매대에 등록
+    function salesToken(uint256 _tokenId, uint256 _price) public {
+        require(_tokenId > 0 && _tokenId <= getCount(), "Does not exists the tokenId");
+        require(msg.sender == ownerOf(_tokenId), "You are not owner of the token");
+        require(salesList[_tokenId] == 0, "The token already exists in salesList");
+        require(_price > 0, "The price is higher than zero");
+
+        setApprove(_tokenId);
+        salesList[_tokenId] = _price;
+    }
+
+    // 판매 리스트 확인 => 전체 리스트 한 번에 보는 거 구현 필요
+    function getSalesList(uint256 _tokenId) public view returns(uint256, uint256, string memory, address) {
+        require(_tokenId > 0 && _tokenId <= getCount(), "Does not exists the tokenId");
+        require(salesList[_tokenId] > 0, "Does not sales the token");
+
+        return (
+            _tokenId,
+            salesList[_tokenId],
+            tokenURI(_tokenId),
+            ownerOf(_tokenId)
+        );
+    }
+
+    // get token price
+    function getTokenPrice(uint256 _tokenId) public view returns(uint256) {
+        require(_tokenId > 0 && _tokenId <= getCount(), "Does not exists the tokenId");
+        require(salesList[_tokenId] > 0, "Does not sales the token");
+
+        return salesList[_tokenId];
+    }
+
+    // token Counter
     function getCount() public view returns(uint256) {
-        if (_tokenIds.current() < 1)
-            return 0;
-        else
-            return _tokenIds.current();
+        return _tokenIds.current();
     }
 
-    function getOwnerList(uint256 _tokenId) public view returns(address[] memory) {
-        return ownerList[_tokenId];
+    // owner history of the token
+    function getOwnerHistory(uint256 _tokenId) public view returns(address[] memory) {
+        require(_tokenId > 0 && _tokenId <= getCount(), "Does not exists the tokenId");
+        return ownerHistory[_tokenId];
     }
 
-    function getTokenList(address _account) public view returns(uint256[] memory) {
-        return tokenList[_account];
+    // my token list
+    function getMyTokenList(address _account) public view returns(uint256[] memory) {
+        return myTokenList[_account];
+    }
+
+    // get contract balance
+    function getContractBalance() public view returns(uint256) {
+        return address(this).balance;
     }
 }
