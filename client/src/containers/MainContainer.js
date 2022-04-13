@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Main from '../components/Main';
 
 const MainContainer = (props) => {
-    const { account, BFT } = props;
-    const [TokenId, setTokenId] = useState(1);
-    const [Address, setAddress] = useState("");
-    const [URI, setURI] = useState("");
+    const { account, BFT, Market, client, BFTaddress, Marketaddress } = props;
+    const [tokenId, setTokenId] = useState(1);
+    const [address, setAddress] = useState("");
+    const [file, setFile] = useState("");
+    const [IPFS_URL, setURL] = useState("");
+
+    useEffect(() => {
+        document.querySelector(".contractAddr").innerHTML = BFTaddress;
+    }, [])
 
     const tokenIdChanged = (e) => {
         setTokenId(e.target.value);
@@ -13,75 +18,52 @@ const MainContainer = (props) => {
     const addressChanged = (e) => {
         setAddress(e.target.value);
     }
-    
-    const getCount = async () => {
-        const count = await BFT.methods.getCount().call();
-        document.querySelector(".count").innerHTML = count;
-    }
 
-    const tokenURI = async () => {
+// 완료
+    const ownerHistory = async () => {
         const count = await BFT.methods.getCount().call();
-        if (0 < TokenId && TokenId <= count) {
-            const uri = await BFT.methods.tokenURI(TokenId).call();
-            setURI("http://"+uri);
-            document.querySelector(".uri").innerHTML = uri;
-        }
-        else {
-            window.alert("[ ERROR ] Token Counter over or No exist token");
-        }
-    }
-
-    const ownerOf = async () => {
-        const count = await BFT.methods.getCount().call();
-        if (0 < TokenId && TokenId <= count) {
-            const owner = await BFT.methods.ownerOf(TokenId).call();
-            document.querySelector(".owner").innerHTML = owner;
-        }
-        else {
-            window.alert("[ ERROR ] NFT Counter over or No exist token");
-        }
-    }
-
-    const getOwnerList = async () => {
-        const count = await BFT.methods.getCount().call();
-        if (0 < TokenId && TokenId <= count) {
-            const ownerList = await BFT.methods.getOwnerList(TokenId).call();
+        if (0 < tokenId && tokenId <= count) {
+            document.querySelector(".ownerHistory").innerHTML = "";
+            const ownerList = await BFT.methods.getOwnerHistory(tokenId).call();
+            
             for (let i = 0; i < ownerList.length; i++) {
                 console.log(i);
                 console.log(ownerList[i]);
-                document.querySelector(".ownerList").append(`${ownerList[i]}\n`);
+                document.querySelector(".ownerHistory").append(`${ownerList[i]}\n`);
             }
         }
         else {
             window.alert("[ ERROR ] NFT Counter over or No exist token");
         }
     }
+// 완료
+    const fileBuffer = async (e) => {
+        const data = await e.target.files[0];
+        const reader = new FileReader();
 
-    const getTokenList = async () => {
-        const tokenList = await BFT.methods.getTokenList(Address).call();
-        if (tokenList !== "") {
-            document.querySelector(".tokenList").innerHTML = "Nothing";
+        reader.readAsArrayBuffer(data);
+        reader.onload = () => {
+            setFile(Buffer(reader.result));
         }
-        else {
-            document.querySelector(".tokenList").innerHTML = tokenList;
-        }
-    }
 
-    const sendToken = async (e) => {
         e.preventDefault();
-        const tokenId = await e.target.tokenId.value;
-        const to = await e.target.to.value;
-        const send = await BFT.methods.sendToken(tokenId, to, account).send({from: account});
-        document.querySelector(".blockNumber").innerHTML = send.blockNumber;
-        document.querySelector(".blockHash").innerHTML = send.blockHash;
-        document.querySelector(".txHash").innerHTML = send.transactionHash;
     }
-
+// 완료
     const createToken = async (e) => {
         e.preventDefault();
-        const cid = await e.target.cid.value;
-        const create = await BFT.methods.create(account, cid).send({from: account});
-        console.log(create);
+
+        const created = await client.add(file);
+        await BFT.methods.createToken(created.path).send({from: account});
+
+        const url = `https://ipfs.infura.io/ipfs/${created.path}`;
+        setURL(url);
+
+        document.querySelector(".cid").innerHTML = created.path;
+        document.querySelector(".url").innerHTML = url;
+    }
+
+    const salesToken = () => {
+
     }
 
     return (
@@ -89,14 +71,14 @@ const MainContainer = (props) => {
             account={account}
             tokenIdChanged={tokenIdChanged}
             addressChanged={addressChanged}
-            getCount={getCount}
-            tokenURI={tokenURI}
-            URI={URI}
-            ownerOf={ownerOf}
-            getOwnerList={getOwnerList}
-            getTokenList={getTokenList}
-            sendToken={sendToken}
+            
+            ownerHistory={ownerHistory}
+            
+            fileBuffer={fileBuffer}
             createToken={createToken}
+            IPFS_URL={IPFS_URL}
+
+            salesToken={salesToken}
         />
     )
 }

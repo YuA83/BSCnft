@@ -1,25 +1,32 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { create } from 'ipfs-http-client';
 import Web3 from 'web3';
 
-import BFT from './build-contracts/BFT.json';
+import BFTbuild from './contracts_build/BscNFT.json';
+import Marketbuild from './contracts_build/Market.json';
 import MainContainer from './containers/MainContainer';
 
 const App = () => {
     const { ethereum, alert } = window;
-    const [Account, setAccount] = useState("");
-    // const [NetworkId, setNetworkId] = useState("");
-    const [Contract, setContract] = useState("");
+    const [account, setAccount] = useState("");
+    // const [chain, setChain] = useState("");
+    const [BFT, setBFT] = useState("");
+    const [BFTaddress, setBFTaddress] = useState("");
+    const [Marketaddress, setMarketaddress] = useState("");
+    const [Market, setMarket] = useState("");
+
+    const client = create("https://ipfs.infura.io:5001/api/v0");
 
     useEffect(() => {
         getWeb3();
-    // }, [Account, NetworkId]);
-    }, [Account]);
+    }, []);
 
+    // Ethereum Provider API
+    // if the account is changed, rerendering
     ethereum.on("accountsChanged", () => {
         getWeb3();
     });
-
     // ethereum.on("chainChanged", () => {
     //     getWeb3();
     // });
@@ -32,12 +39,16 @@ const App = () => {
             const accounts = await web3.eth.getAccounts();
             setAccount(accounts[0]);
 
-            const netId = await web3.eth.net.getId();
-            const network = await BFT.networks[netId];
-            // setNetworkId(netId);
+            const networkId = await web3.eth.net.getId();
+            // setChain(networkId);
+            
+            const BFTaddress = await BFTbuild.networks[networkId].address;
+            setBFTaddress(BFTaddress);
+            const Marketaddress = await Marketbuild.networks[networkId].address;
+            setMarketaddress(Marketaddress);
 
-            const contractBFT = new web3.eth.Contract(BFT.abi, network.address);
-            setContract(contractBFT);
+            setBFT(new web3.eth.Contract(BFTbuild.abi, BFTaddress));
+            setMarket(new web3.eth.Contract(Marketbuild.abi, Marketaddress));
         }
         else {
             alert("Please install MetaMask");
@@ -45,10 +56,9 @@ const App = () => {
     }
 
     return (
-        <>
-        {/* react-router-dom 최신버전(v.6)부터 Switch => Routes, component => element 로 변경 */}
+        <> {/* react-router-dom 최신버전(v.6)부터 Switch => Routes, component => element 로 변경 */}
         <Routes>
-            <Route path="/" element={<MainContainer account={Account} BFT={Contract}/>} />
+            <Route path="/" element={<MainContainer account={account} BFT={BFT} Market={Market} client={client} BFTaddress={BFTaddress} Marketaddress={Marketaddress}/>} />
         </Routes>
         </>
     );

@@ -598,7 +598,8 @@ contract BscNFT is ERC721URIStorage {
         require(_price > 0, "The price is higher than zero");
 
         setApprove(_tokenId);
-        salesList[_tokenId] = _price;
+        // salesList[_tokenId] = _price;
+        salesList[_tokenId] = _price * 10 ** 18; // bnb to wei
     }
 
     // get list of token on sale

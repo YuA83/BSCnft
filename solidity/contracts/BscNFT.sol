@@ -49,8 +49,10 @@ contract BscNFT is ERC721URIStorage {
         for (uint i = 0; i < len; i++) {
             if (myTokenList[seller][i] == _tokenId) {
                 myTokenList[seller][i] = myTokenList[seller][len-1];
+                // break;
             }
         }
+        // myTokenList[seller].length--;
         myTokenList[seller].pop();
         
         ownerHistory[_tokenId].push(_buyer);
@@ -72,7 +74,8 @@ contract BscNFT is ERC721URIStorage {
         require(_price > 0, "The price is higher than zero");
 
         setApprove(_tokenId);
-        salesList[_tokenId] = _price;
+        // salesList[_tokenId] = _price;
+        salesList[_tokenId] = _price * 10 ** 18; // bnb to wei
     }
 
     // get list of token on sale

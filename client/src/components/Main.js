@@ -3,62 +3,58 @@ import React from 'react';
 const Main = (props) => {
     const { 
         account, tokenIdChanged, addressChanged, 
-        getCount, tokenURI, URI, ownerOf, 
-        getOwnerList, getTokenList, sendToken, createToken } = props;
+        ownerHistory, 
+        fileBuffer, createToken, IPFS_URL,
+        salesToken,
+    } = props;
+
     return (
         <>
         <div>
-            <h2>Account</h2>
-            <p>{account}</p>
+            <span className="contractAddr"></span>
         </div>
         <div>
-            <h2>NFT Count</h2>
+            <h4>My Wallet</h4>
+            <h5>Account: </h5><span>{account}</span>
+            <h5>My Token List</h5>
+            <ul className="myTokenList"></ul>
+        </div>
+        <div>
+            <h4>NFT Count</h4>
             <p className="count"></p>
-            <button onClick={getCount}>click</button>
+            {/* count, tokenId, Image, 판매 유무 */}
         </div>
         <div>
-            <h2>TokenURI</h2>
-            <a className="uri" href={URI} target="_blank"></a>
-            <input type="number" min="1" onChange={tokenIdChanged} placeholder="tokenId"/>
-            <button onClick={tokenURI}>click</button>
+            {/* 판매 리스트 (토큰 아이디, 이미지, 소유주, 가격) */}
         </div>
         <div>
-            <h2>OwnerOf</h2>
-            <p className="owner"></p>
-            <input type="number" min="1" onChange={tokenIdChanged} placeholder="tokenId"/>
-            <button onClick={ownerOf}>click</button>
-        </div>
-        <div>
-            <h2>GetOwnerList</h2>
-            <p className="ownerList"></p>
-            <input type="number" min="1" onChange={tokenIdChanged} placeholder="tokenId"/>
-            <button onClick={getOwnerList}>click</button>
-        </div>
-        <div>
-            <h2>GetTokenList</h2>
-            <p className="tokenList"></p>
-            <input type="text" onChange={addressChanged} placeholder="address"/>
-            <button onClick={getTokenList}>click</button>
-        </div>
-        <div>
-            <h2>Create</h2>
-            <form onSubmit={createToken}> 
-                <input type="text" name="cid" placeholder="IPFS CID"/>
-                <button type="submit">create</button>
-            </form>
-        </div>
-        <div>
-            <h2>SendToken</h2>
-            <form onSubmit={sendToken}>
-                <input type="number" name="tokenId" placeholder="tokenId"/>
-                <input type="text" name="to" placeholder="toAddress"/>
-                <button type="submit">send</button>
+            <h4>IPFS File Upload & Create Token</h4>
+            <form onSubmit={createToken}>
+                <input type="file" name="file" placeholder="upload your file" onChange={fileBuffer}/>
+                <button type="submit">upload</button>
             </form>
             <div>
-                <h5>BlockNumber :</h5><span className="blockNumber"></span>
-                <h5>BlockHash :</h5><span className="blockHash"></span>
-                <h5>TxHash :</h5><span className="txHash"></span>
+                <h4>Create Result</h4>
+                <h5>CID :</h5><span className="cid"></span>
+                <h5>URL :</h5><a className="url" href={IPFS_URL} target="_blank"></a>
+                <img src={IPFS_URL}/>
             </div>
+        </div>
+        <div>
+            <h4>Sales Token</h4>
+            <form onSubmit={salesToken}>
+                <input type="number" onChange={tokenIdChanged} placeholder="tokenId"/>
+                <input type="text" placeholder="price"/>
+            </form>
+        </div>
+        <div>
+            <h4>Buy Token</h4>
+        </div>
+        <div>
+            <h4>The Token Owner History</h4>
+            <p className="ownerHistory"></p>
+            <input type="number" min="1" onChange={tokenIdChanged} placeholder="tokenId"/>
+            <button onClick={ownerHistory}>click</button>
         </div>
         </>
     )
